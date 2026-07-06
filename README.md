@@ -27,3 +27,5 @@ Prereqs on PATH: `cargo`, `rustfmt`/`clippy` components, `cargo-deny`,
 comment the `coverage` command out and rely on the CI gate instead.
 
 Not a product. Expect force-pushes and churn.
+
+<!-- demo PR to exercise dependency-review + PR-title checks -->
