@@ -88,11 +88,31 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { persist-credentials: "false" }
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable branch head
+        with: { components: llvm-tools-preview }
+      - uses: taiki-e/install-action@4684b8405694ae9dd42c9f39ba901a70ae83f4a3 # v2.82.9
+        with: { tool: cargo-llvm-cov }
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      # No pipe into tee here on purpose: the private-repo review found that
-      # the default run shell lacks pipefail, so `cargo test | tee` masks
-      # failures. Plain invocation keeps the exit code authoritative.
-      - run: cargo test --workspace --all-features
+      # Runs the whole test suite under llvm-cov (no pipe into tee: the default
+      # run shell lacks pipefail, so piping would mask failures). The spawned
+      # binary in tests/cli.rs is instrumented too, so main() counts honestly.
+      - name: Test with coverage (gate 80% lines)
+        env:
+          COVERAGE_MIN: "80"
+        run: |
+          set -euo pipefail
+          cargo llvm-cov --workspace --all-features \
+            --lcov --output-path lcov.info \
+            --fail-under-lines "$COVERAGE_MIN"
+          {
+            echo "### Rust coverage (gate: ${COVERAGE_MIN}% lines)"
+            echo '```'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rust-coverage
+          path: lcov.info
 
   summary:
     name: Summary

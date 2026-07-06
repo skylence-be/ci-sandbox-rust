@@ -1,4 +1,5 @@
 //! Tiny library so the CI pipeline has real code to format, lint, and test.
+#![warn(missing_docs)]
 
 use anyhow::{Result, bail};
 
