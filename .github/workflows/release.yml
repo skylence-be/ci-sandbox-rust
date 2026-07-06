@@ -177,7 +177,7 @@ jobs:
           VER="${TAG#v}"
           mkdir -p bin dist
           7z x "in/ci-sandbox-rust-$TAG-x86_64-pc-windows-msvc.zip" -obin >/dev/null
-          dotnet tool install --global wix --version 7.0.0
+          dotnet tool install --global wix --version 5.0.2
           export PATH="$PATH:$HOME/.dotnet/tools"
           wix build -arch x64 \
             -d "Version=$VER" \
