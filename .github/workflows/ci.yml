@@ -27,7 +27,18 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { persist-credentials: "false" }
       - uses: taiki-e/install-action@4684b8405694ae9dd42c9f39ba901a70ae83f4a3 # v2.82.9
-        with: { tool: "actionlint,zizmor" }
+        with: { tool: zizmor }
+      - name: Install actionlint (pinned, checksum-verified, no root)
+        run: |
+          set -euo pipefail
+          V=1.7.12
+          curl -fsSLo actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${V}/actionlint_${V}_linux_amd64.tar.gz"
+          curl -fsSLo checksums.txt "https://github.com/rhysd/actionlint/releases/download/v${V}/actionlint_${V}_checksums.txt"
+          grep "actionlint_${V}_linux_amd64.tar.gz" checksums.txt | sha256sum -c -
+          tar xzf actionlint.tar.gz actionlint
+          mkdir -p "$HOME/.local/bin"
+          install actionlint "$HOME/.local/bin/actionlint"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: actionlint
       - run: zizmor .github/workflows/
         env:
