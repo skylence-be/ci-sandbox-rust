@@ -1,0 +1,33 @@
+# Git hooks for ci-sandbox-rust, managed by lefthook (https://lefthook.dev).
+#
+# One-time per clone (hooks live in .git/hooks, which is NOT cloned):
+#   lefthook install
+# Prerequisites on PATH: cargo, rustfmt + clippy components, cargo-deny, cargo-llvm-cov.
+# Skip a slow hook ad hoc:  LEFTHOOK_EXCLUDE=coverage lefthook run pre-push
+#
+# Split rationale: pre-commit is instant feedback (format only); the
+# compile-heavy gates that mirror CI run at pre-push, right before code is shared.
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.rs"
+      run: cargo fmt --all --check
+
+pre-push:
+  # Serial on purpose: one cargo compile at a time bounds peak RAM (mirrors the
+  # single-build-slot rule on constrained hosts). Set parallel: true on roomy CI.
+  parallel: false
+  commands:
+    clippy:
+      # -D warnings also promotes missing_docs, enforcing API doc coverage,
+      # the closest Rust analogue to "type coverage".
+      run: cargo clippy --all-targets --all-features -- -D warnings
+    deny:
+      run: cargo deny check
+    coverage:
+      # Runs the whole suite AND enforces the 100% line gate (identical to CI).
+      # This is the heaviest step (instrumented full compile). On a
+      # RAM-constrained host, prefer commenting it out and trusting the CI gate.
+      run: cargo llvm-cov --workspace --all-features --fail-under-lines 100

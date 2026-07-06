@@ -1,1 +1,6 @@
 /target
+
+# local coverage scratch from lefthook hooks
+lcov.info
+coverage.out
+coverage.html
