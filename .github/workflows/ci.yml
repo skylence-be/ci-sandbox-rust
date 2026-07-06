@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  lint-workflows:
+    name: Workflow lint (actionlint + zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { persist-credentials: "false" }
+      - uses: taiki-e/install-action@ace6ebe54a6a0c86dfb5f7764b17f793b6925bc3 # v2
+        with: { tool: "actionlint,zizmor" }
+      - run: actionlint
+      - run: zizmor .github/workflows/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { persist-credentials: "false" }
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with: { components: rustfmt }
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { persist-credentials: "false" }
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with: { components: clippy }
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { persist-credentials: "false" }
+      - uses: taiki-e/install-action@ace6ebe54a6a0c86dfb5f7764b17f793b6925bc3 # v2
+        with: { tool: cargo-deny }
+      - run: cargo deny check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [fmt, clippy, deny]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { persist-credentials: "false" }
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      # No pipe into tee here on purpose: the private-repo review found that
+      # the default run shell lacks pipefail, so `cargo test | tee` masks
+      # failures. Plain invocation keeps the exit code authoritative.
+      - run: cargo test --workspace --all-features
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint-workflows, fmt, clippy, deny, test]
+    if: always()
+    env:
+      R_LINTWF: ${{ needs.lint-workflows.result }}
+      R_FMT: ${{ needs.fmt.result }}
+      R_CLIPPY: ${{ needs.clippy.result }}
+      R_DENY: ${{ needs.deny.result }}
+      R_TEST: ${{ needs.test.result }}
+    steps:
+      - name: Render summary
+        run: |
+          {
+            echo "### Rust CI (hosted)"
+            echo ""
+            echo "| Stage | Result |"
+            echo "|-------|--------|"
+            echo "| Workflow lint | $R_LINTWF |"
+            echo "| Format | $R_FMT |"
+            echo "| Clippy | $R_CLIPPY |"
+            echo "| cargo-deny | $R_DENY |"
+            echo "| Test | $R_TEST |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail if any stage failed
+        run: |
+          for r in "$R_LINTWF" "$R_FMT" "$R_CLIPPY" "$R_DENY" "$R_TEST"; do
+            [ "$r" = "success" ] || { echo "::error::a stage did not succeed ($r)"; exit 1; }
+          done

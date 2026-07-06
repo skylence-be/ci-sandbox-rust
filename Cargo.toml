@@ -1,0 +1,9 @@
+[package]
+name = "ci-sandbox-rust"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Minimal Rust project exercising the Skylence CI shape on GitHub-hosted runners."
+
+[dependencies]
+anyhow = "1"
