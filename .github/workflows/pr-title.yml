@@ -1,0 +1,22 @@
+name: PR Title
+
+# Enforces Conventional Commits on the PR title, which feeds squash-merge
+# commit messages and the release/changelog automation. Uses pull_request
+# (not pull_request_target) to stay clear of the privileged-context risk that
+# workflow security linters flag.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  title:
+    name: Lint PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
